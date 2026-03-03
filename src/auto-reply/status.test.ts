@@ -306,6 +306,65 @@ describe("buildStatusMessage", () => {
     expect(normalized).toContain("di_123...abc");
   });
 
+  it("shows configured fallback models when no runtime fallback is active", () => {
+    const text = buildStatusMessage({
+      agent: {
+        model: {
+          primary: "anthropic/claude-opus-4-6",
+          fallbacks: ["google/gemini-2.5-flash", "openai/gpt-4.1"],
+        },
+        contextTokens: 32_000,
+      },
+      sessionEntry: {
+        sessionId: "configured-fb",
+        updatedAt: 0,
+        contextTokens: 32_000,
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "api-key",
+    });
+
+    const normalized = normalizeTestText(text);
+    expect(normalized).toContain("Model: anthropic/claude-opus-4-6");
+    expect(normalized).toContain("Fallbacks: google/gemini-2.5-flash, openai/gpt-4.1");
+  });
+
+  it("hides configured fallbacks when runtime fallback is active", () => {
+    const text = buildStatusMessage({
+      agent: {
+        model: {
+          primary: "openai/gpt-4.1-mini",
+          fallbacks: ["anthropic/claude-haiku-4-5"],
+        },
+        contextTokens: 32_000,
+      },
+      sessionEntry: {
+        sessionId: "active-fb",
+        updatedAt: 0,
+        providerOverride: "openai",
+        modelOverride: "gpt-4.1-mini",
+        modelProvider: "anthropic",
+        model: "claude-haiku-4-5",
+        fallbackNoticeSelectedModel: "openai/gpt-4.1-mini",
+        fallbackNoticeActiveModel: "anthropic/claude-haiku-4-5",
+        fallbackNoticeReason: "rate limit",
+        contextTokens: 32_000,
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "api-key",
+    });
+
+    const normalized = normalizeTestText(text);
+    // Active fallback shown
+    expect(normalized).toContain("Fallback: anthropic/claude-haiku-4-5");
+    // Configured fallbacks line NOT shown (would duplicate)
+    expect(normalized).not.toContain("Fallbacks:");
+  });
+
   it("omits active fallback details when runtime drift does not match fallback state", () => {
     const text = buildStatusMessage({
       agent: {
